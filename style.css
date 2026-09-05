@@ -232,8 +232,14 @@ button {
   outline-offset: -1px;
 }
 
-.toggle {
+.actions {
+  display: flex;
+  gap: 0.5rem;
   margin-top: 0.7rem;
+}
+
+.toggle {
+  flex: 1;
   min-height: 44px;
   padding: 0 1rem;
   border: 1px solid var(--border);
@@ -266,6 +272,69 @@ button {
   text-align: center;
   white-space: pre-wrap;
   font-size: 0.92rem;
+}
+
+.reject {
+  flex: 0 0 auto;
+  width: 48px;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg);
+  font-size: 1rem;
+  filter: grayscale(1);
+  opacity: 0.5;
+}
+
+.reject[aria-pressed="true"] {
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  filter: none;
+  opacity: 1;
+}
+
+.card.is-rejected {
+  opacity: 0.45;
+}
+
+.card.is-rejected:focus-within {
+  opacity: 1;
+}
+
+/* 별로 표시 상태줄 */
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.6rem 1rem 0;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+}
+
+.status-count {
+  flex: 1;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.status-btn {
+  min-height: 32px;
+  padding: 0 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.status-btn.is-on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 /* 수식 */

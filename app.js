@@ -1,15 +1,27 @@
 const ANSWERS_KEY = 'ml-quiz-answers';
-const COLLAPSED_KEY = 'ml-quiz-collapsed';
+const EXPANDED_KEY = 'ml-quiz-expanded';
+const REJECTED_KEY = 'ml-quiz-rejected';
+const HIDE_KEY = 'ml-quiz-hide-rejected';
+
 const TYPES = ['short', 'essay'];
-const TYPE_LABEL = { short: '단답형', essay: '서술형' };
 
 const listEl = document.getElementById('list');
 const tabsEl = document.getElementById('type-tabs');
 const jumpEl = document.getElementById('jump');
+const statusEl = document.getElementById('status');
+const statusCountEl = document.getElementById('status-count');
+const copyBtn = document.getElementById('copy-btn');
+const hideBtn = document.getElementById('hide-btn');
 
 let activeType = typeFromHash();
 const answers = readJSON(ANSWERS_KEY, {});
-const collapsed = new Set(readJSON(COLLAPSED_KEY, []));
+const expanded = new Set(readJSON(EXPANDED_KEY, []));
+const rejected = new Set(readJSON(REJECTED_KEY, []));
+let hideRejected = readJSON(HIDE_KEY, false) === true;
+
+// 화면에 붙인 카드와 섹션. 별로 표시가 바뀔 때마다 여기를 훑어 갱신한다.
+const cards = [];
+const sections = [];
 
 /* 저장 */
 
@@ -82,6 +94,56 @@ function trackHeaderHeight() {
   new ResizeObserver(apply).observe(header);
 }
 
+/* 별로 표시 */
+
+function applyRejection() {
+  for (const { q, el } of cards) {
+    const off = rejected.has(q.id);
+    el.classList.toggle('is-rejected', off);
+    el.hidden = off && hideRejected;
+  }
+
+  for (const section of sections) {
+    const left = section.items.filter(
+      (it) => !(hideRejected && rejected.has(it.q.id))
+    ).length;
+    section.countEl.textContent = left;
+    section.el.hidden = left === 0;
+  }
+
+  statusEl.hidden = rejected.size === 0;
+  statusCountEl.textContent = `별로 표시 ${rejected.size}개`;
+  hideBtn.textContent = hideRejected ? '보이기' : '숨기기';
+  hideBtn.classList.toggle('is-on', hideRejected);
+}
+
+function rejectedIds() {
+  return cards.filter(({ q }) => rejected.has(q.id)).map(({ q }) => q.id);
+}
+
+copyBtn.addEventListener('click', async () => {
+  const text = rejectedIds().join(', ');
+  try {
+    await navigator.clipboard.writeText(text);
+    copyBtn.textContent = '복사됨';
+  } catch (err) {
+    console.warn('클립보드 복사 실패', err);
+    copyBtn.textContent = '복사 실패';
+    window.prompt('아래 목록을 직접 복사하세요.', text);
+  }
+  setTimeout(() => {
+    copyBtn.textContent = '목록 복사';
+  }, 1500);
+});
+
+hideBtn.addEventListener('click', () => {
+  hideRejected = !hideRejected;
+  writeJSON(HIDE_KEY, hideRejected);
+  applyRejection();
+  const pane = document.querySelector(`.pane[data-type="${activeType}"]`);
+  if (pane) resizeVisible(pane);
+});
+
 /* 조립 */
 
 function buildCard(q, number) {
@@ -137,7 +199,26 @@ function buildCard(q, number) {
     toggle.setAttribute('aria-expanded', String(willOpen));
   });
 
-  card.append(toggle, answer);
+  const reject = document.createElement('button');
+  reject.type = 'button';
+  reject.className = 'reject';
+  reject.textContent = '👎';
+  reject.title = '별로인 문제로 표시';
+  reject.setAttribute('aria-label', '별로인 문제로 표시');
+  reject.setAttribute('aria-pressed', String(rejected.has(q.id)));
+  reject.addEventListener('click', () => {
+    if (rejected.has(q.id)) rejected.delete(q.id);
+    else rejected.add(q.id);
+    reject.setAttribute('aria-pressed', String(rejected.has(q.id)));
+    writeJSON(REJECTED_KEY, [...rejected]);
+    applyRejection();
+  });
+
+  const actions = document.createElement('div');
+  actions.className = 'actions';
+  actions.append(toggle, reject);
+
+  card.append(actions, answer);
   return card;
 }
 
@@ -145,7 +226,6 @@ function buildSection(type, topic, items, startNumber) {
   const key = `${type}:${topic}`;
   const section = document.createElement('section');
   section.className = 'topic';
-  section.id = 'topic-' + encodeURIComponent(key);
 
   const body = document.createElement('div');
   body.className = 'topic-body';
@@ -169,16 +249,24 @@ function buildSection(type, topic, items, startNumber) {
 
   head.addEventListener('click', () => {
     const open = body.hidden;
-    if (open) collapsed.delete(key);
-    else collapsed.add(key);
-    writeJSON(COLLAPSED_KEY, [...collapsed]);
+    if (open) expanded.add(key);
+    else expanded.delete(key);
+    writeJSON(EXPANDED_KEY, [...expanded]);
     setOpen(open);
   });
 
-  items.forEach((q, i) => body.appendChild(buildCard(q, startNumber + i)));
-  section.append(head, body);
-  setOpen(!collapsed.has(key));
+  const entries = items.map((q, i) => {
+    const el = buildCard(q, startNumber + i);
+    body.appendChild(el);
+    const entry = { q, el };
+    cards.push(entry);
+    return entry;
+  });
 
+  section.append(head, body);
+  setOpen(expanded.has(key));
+
+  sections.push({ el: section, countEl: count, items: entries, setOpen, head, body });
   return section;
 }
 
@@ -265,6 +353,7 @@ fetch('questions.json')
   .then((questions) => {
     listEl.replaceChildren(...TYPES.map((t) => buildPane(t, questions)));
     renderMath(listEl);
+    applyRejection();
     trackHeaderHeight();
     setType(activeType);
   })
