@@ -1,32 +1,33 @@
-const STORAGE_KEY = 'ml-quiz-answers';
+const ANSWERS_KEY = 'ml-quiz-answers';
+const COLLAPSED_KEY = 'ml-quiz-collapsed';
+const TYPES = ['short', 'essay'];
 const TYPE_LABEL = { short: '단답형', essay: '서술형' };
 
 const listEl = document.getElementById('list');
-const countEl = document.getElementById('count');
-const typeFilterEl = document.getElementById('type-filter');
-const tagFilterEl = document.getElementById('tag-filter');
+const tabsEl = document.getElementById('type-tabs');
+const jumpEl = document.getElementById('jump');
 
-let questions = [];
-let activeType = 'all';
-const activeTags = new Set();
-let answers = loadAnswers();
+let activeType = typeFromHash();
+const answers = readJSON(ANSWERS_KEY, {});
+const collapsed = new Set(readJSON(COLLAPSED_KEY, []));
 
 /* 저장 */
 
-function loadAnswers() {
+function readJSON(key, fallback) {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+    const raw = localStorage.getItem(key);
+    return raw === null ? fallback : JSON.parse(raw);
   } catch (err) {
-    console.warn('저장된 답을 읽지 못했습니다.', err);
-    return {};
+    console.warn(`${key}를 읽지 못했습니다.`, err);
+    return fallback;
   }
 }
 
-function saveAnswers() {
+function writeJSON(key, value) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(answers));
+    localStorage.setItem(key, JSON.stringify(value));
   } catch (err) {
-    console.warn('답을 저장하지 못했습니다.', err);
+    console.warn(`${key}를 저장하지 못했습니다.`, err);
   }
 }
 
@@ -38,78 +39,74 @@ function debounce(fn, ms) {
   };
 }
 
-const persist = debounce(saveAnswers, 300);
+const persistAnswers = debounce(() => writeJSON(ANSWERS_KEY, answers), 300);
 
-/* 필터 */
+/* 수식 */
 
-function matches(q) {
-  if (activeType !== 'all' && q.type !== activeType) return false;
-  if (activeTags.size && !q.tags.some((t) => activeTags.has(t))) return false;
-  return true;
+function renderMath(root) {
+  if (typeof renderMathInElement !== 'function') return;
+  renderMathInElement(root, {
+    delimiters: [
+      { left: '$$', right: '$$', display: true },
+      { left: '$', right: '$', display: false },
+      { left: '\\[', right: '\\]', display: true },
+      { left: '\\(', right: '\\)', display: false },
+    ],
+    throwOnError: false,
+  });
 }
 
-function buildTagFilter() {
-  const tags = [...new Set(questions.flatMap((q) => q.tags))].sort((a, b) =>
-    a.localeCompare(b, 'ko')
-  );
-  for (const tag of tags) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'tag-btn';
-    btn.textContent = '#' + tag;
-    btn.addEventListener('click', () => {
-      if (activeTags.has(tag)) activeTags.delete(tag);
-      else activeTags.add(tag);
-      btn.classList.toggle('is-on', activeTags.has(tag));
-      render();
-    });
-    tagFilterEl.appendChild(btn);
-  }
-}
-
-typeFilterEl.addEventListener('click', (e) => {
-  const btn = e.target.closest('.seg-btn');
-  if (!btn) return;
-  activeType = btn.dataset.type;
-  for (const b of typeFilterEl.querySelectorAll('.seg-btn')) {
-    b.classList.toggle('is-on', b === btn);
-  }
-  render();
-});
-
-/* 렌더 */
+/* 크기 */
 
 function autosize(el) {
   el.style.height = 'auto';
   el.style.height = el.scrollHeight + 'px';
 }
 
-function buildCard(q, index) {
+// 숨겨진 요소는 scrollHeight가 0이라, 보이게 된 뒤에 다시 재야 한다.
+function resizeVisible(root) {
+  for (const el of root.querySelectorAll('.input')) {
+    if (el.offsetParent !== null) autosize(el);
+  }
+}
+
+function trackHeaderHeight() {
+  const header = document.querySelector('.header');
+  const apply = () => {
+    document.documentElement.style.setProperty(
+      '--header-h',
+      header.offsetHeight + 'px'
+    );
+  };
+  apply();
+  new ResizeObserver(apply).observe(header);
+}
+
+/* 조립 */
+
+function buildCard(q, number) {
   const card = document.createElement('article');
   card.className = 'card';
-
-  const badges = document.createElement('div');
-  badges.className = 'badges';
-  const typeBadge = document.createElement('span');
-  typeBadge.className = 'badge type';
-  typeBadge.textContent = TYPE_LABEL[q.type] || q.type;
-  badges.appendChild(typeBadge);
-  for (const tag of q.tags) {
-    const el = document.createElement('span');
-    el.className = 'badge';
-    el.textContent = '#' + tag;
-    badges.appendChild(el);
-  }
-  card.appendChild(badges);
 
   const question = document.createElement('p');
   question.className = 'question';
   const num = document.createElement('span');
   num.className = 'num';
-  num.textContent = 'Q' + (index + 1) + '.';
-  question.appendChild(num);
-  question.appendChild(document.createTextNode(q.question));
+  num.textContent = 'Q' + number + '.';
+  question.append(num, document.createTextNode(q.question));
   card.appendChild(question);
+
+  if (q.tags.length) {
+    const badges = document.createElement('div');
+    badges.className = 'badges';
+    for (const tag of q.tags) {
+      const el = document.createElement('span');
+      el.className = 'badge';
+      el.textContent = '#' + tag;
+      badges.appendChild(el);
+    }
+    card.appendChild(badges);
+  }
 
   const input = document.createElement('textarea');
   input.className = 'input';
@@ -119,7 +116,7 @@ function buildCard(q, index) {
   input.addEventListener('input', () => {
     answers[q.id] = input.value;
     autosize(input);
-    persist();
+    persistAnswers();
   });
   card.appendChild(input);
 
@@ -140,51 +137,136 @@ function buildCard(q, index) {
     toggle.setAttribute('aria-expanded', String(willOpen));
   });
 
-  card.appendChild(toggle);
-  card.appendChild(answer);
-
-  // 카드가 화면에 붙은 뒤라야 scrollHeight가 나온다.
-  queueMicrotask(() => autosize(input));
-
+  card.append(toggle, answer);
   return card;
 }
 
-function render() {
-  const shown = questions.filter(matches);
-  listEl.replaceChildren();
+function buildSection(type, topic, items, startNumber) {
+  const key = `${type}:${topic}`;
+  const section = document.createElement('section');
+  section.className = 'topic';
+  section.id = 'topic-' + encodeURIComponent(key);
 
-  if (!shown.length) {
-    const p = document.createElement('p');
-    p.className = 'empty';
-    p.textContent = '조건에 맞는 문제가 없습니다.';
-    listEl.appendChild(p);
-  } else {
-    shown.forEach((q, i) => listEl.appendChild(buildCard(q, i)));
+  const body = document.createElement('div');
+  body.className = 'topic-body';
+
+  const head = document.createElement('button');
+  head.type = 'button';
+  head.className = 'topic-head';
+  const name = document.createElement('span');
+  name.className = 'topic-name';
+  name.textContent = topic;
+  const count = document.createElement('span');
+  count.className = 'topic-count';
+  count.textContent = items.length;
+  head.append(name, count);
+
+  const setOpen = (open) => {
+    body.hidden = !open;
+    head.setAttribute('aria-expanded', String(open));
+    if (open) resizeVisible(body);
+  };
+
+  head.addEventListener('click', () => {
+    const open = body.hidden;
+    if (open) collapsed.delete(key);
+    else collapsed.add(key);
+    writeJSON(COLLAPSED_KEY, [...collapsed]);
+    setOpen(open);
+  });
+
+  items.forEach((q, i) => body.appendChild(buildCard(q, startNumber + i)));
+  section.append(head, body);
+  setOpen(!collapsed.has(key));
+
+  return section;
+}
+
+function buildPane(type, questions) {
+  const pane = document.createElement('div');
+  pane.className = 'pane';
+  pane.dataset.type = type;
+
+  const items = questions.filter((q) => q.type === type);
+  const topics = [...new Set(items.map((q) => q.topic))];
+
+  const row = document.createElement('div');
+  row.className = 'jump-row';
+  row.dataset.type = type;
+
+  let number = 1;
+  for (const topic of topics) {
+    const group = items.filter((q) => q.topic === topic);
+    const section = buildSection(type, topic, group, number);
+    number += group.length;
+    pane.appendChild(section);
+
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'chip';
+    chip.textContent = topic;
+    chip.addEventListener('click', () => {
+      const body = section.querySelector('.topic-body');
+      if (body.hidden) section.querySelector('.topic-head').click();
+      section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    row.appendChild(chip);
   }
 
-  countEl.textContent = `${shown.length} / ${questions.length}문항`;
+  jumpEl.appendChild(row);
+  return pane;
 }
+
+/* 유형 전환 */
+
+function typeFromHash() {
+  const hash = decodeURIComponent(location.hash.slice(1));
+  return TYPES.includes(hash) ? hash : 'short';
+}
+
+function setType(type) {
+  activeType = type;
+  for (const el of document.querySelectorAll('.pane, .jump-row')) {
+    el.hidden = el.dataset.type !== type;
+  }
+  for (const btn of tabsEl.querySelectorAll('.seg-btn')) {
+    const on = btn.dataset.type === type;
+    btn.classList.toggle('is-on', on);
+    btn.setAttribute('aria-selected', String(on));
+  }
+  const pane = document.querySelector(`.pane[data-type="${type}"]`);
+  if (pane) resizeVisible(pane);
+}
+
+tabsEl.addEventListener('click', (e) => {
+  const btn = e.target.closest('.seg-btn');
+  if (!btn) return;
+  location.hash = btn.dataset.type;
+  if (typeFromHash() === activeType) setType(activeType);
+});
+
+window.addEventListener('hashchange', () => setType(typeFromHash()));
+
+/* 시작 */
 
 function showError(message) {
   listEl.replaceChildren();
-  countEl.textContent = '';
   const p = document.createElement('p');
   p.className = 'error';
   p.textContent = message;
   listEl.appendChild(p);
 }
 
-/* 시작 */
-
 fetch('questions.json')
   .then((res) => {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
   })
-  .then((data) => {
-    questions = data;
-    buildTagFilter();
-    render();
+  .then((questions) => {
+    listEl.replaceChildren(...TYPES.map((t) => buildPane(t, questions)));
+    renderMath(listEl);
+    trackHeaderHeight();
+    setType(activeType);
   })
   .catch((err) => {
     showError(
