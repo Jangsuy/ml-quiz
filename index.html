@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="ML Quiz">
+<meta name="theme-color" content="#f7f7f5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16161a" media="(prefers-color-scheme: dark)">
+<title>ML Quiz</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="header">
+  <h1 class="title">ML Quiz</h1>
+  <div class="seg" id="type-filter" role="group" aria-label="문제 유형">
+    <button type="button" class="seg-btn is-on" data-type="all">전체</button>
+    <button type="button" class="seg-btn" data-type="short">단답형</button>
+    <button type="button" class="seg-btn" data-type="essay">서술형</button>
+  </div>
+  <div class="tags" id="tag-filter" aria-label="태그"></div>
+  <p class="count" id="count" role="status"></p>
+</header>
+
+<main class="list" id="list"></main>
+
+<script src="app.js"></script>
+</body>
+</html>
