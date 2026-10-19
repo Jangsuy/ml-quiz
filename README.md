@@ -54,3 +54,12 @@ KaTeX를 쓴다. `$...$`는 문장 안에, `$$...$$`는 별도 줄에 렌더된�
 ```
 python3 -m http.server 8000
 ```
+
+## 노트
+
+`notes.html`은 `notes.md`를 불러와 마크다운과 KaTeX로 렌더한다. 퀴즈 헤더의 `노트` 링크로 들어간다.
+
+https://jangsuy.github.io/ml-quiz/notes.html
+
+- 내용은 `notes.md`만 고치면 된다. 일반 마크다운 파일이라 백슬래시를 두 번 쓸 필요가 없다.
+- `# ` 제목이 상단 바로가기 칩이 된다.
