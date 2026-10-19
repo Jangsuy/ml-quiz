@@ -143,6 +143,8 @@
     - non-linearity 없이 layer를 늘려도 표현력은 늘지 않는다
     - non-linearity를 포함한 layer를 쌓으면 어떤 복잡한 함수든 근사할 수 있다
 
+![image.png](notes-img/image.png)
+
 ## Gradients
 
 - 변수에 대한 derivative는 그 값이 바뀔 때 전체 식이 얼마나 민감하게 변하는지 알려준다
@@ -187,6 +189,8 @@
     \mathbf h&=f(\mathbf W\mathbf x+\mathbf b)\in\mathbb{R}^k & \mathbf W\in\mathbb{R}^{k\times d},\mathbf b\in\mathbb{R}^k\\
     \mathbf s&=\mathbf u^\intercal\mathbf h\in\mathbb{R} & \mathbf u\in\mathbb{R}^k\end{align*}
     $$
+
+![image.png](notes-img/image-1.png)
     
 
 - element-wise activation function $\mathbf h=f(\mathbf z)$에서 $\mathbf h,\mathbf z\in\mathbb{R}^n$일 때 ${\partial\mathbf h}/{\partial\mathbf z}$는 무엇인가?
@@ -315,6 +319,8 @@
 - graph의 각 node는 upstream gradient를 받아 downstream gradient를 내려보낸다
     - 각 node에는 local gradient(입력에 대한 출력의 gradient)가 있다
     - downstream gradient = upstream gradient $\times$ local gradient
+
+![image.png](notes-img/image-2.png)
 
 - 바깥으로 갈라지는 branch에서는 gradient를 더한다
     - $y$가 $a$와 $b$ 계산에 모두 쓰이면 $\frac{\partial f}{\partial y}=\frac{\partial f}{\partial a}\frac{\partial a}{\partial y}+\frac{\partial f}{\partial b}\frac{\partial b}{\partial y}$
@@ -790,6 +796,8 @@ class AdamW(torch.optim.Optimizer):
 | K | key/value head 수, GQA에서는 K < N |
 | G | GQA의 group size = N // K |
 
+![image.png](notes-img/transformer.png)
+
 **token embedding**
 
 - embedding matrix $\mathbf W_e\in\mathbb R^{V\times D}$, 초기 hidden states $\mathbf X^{(0)}\in\mathbb R^{B\times S\times D}$
@@ -1150,6 +1158,8 @@ $$
 - **sparse attention**
 - local attention과 global attention을 번갈아 쓴다
 
+![image.png](notes-img/image-3.png)
+
 ## RMSNorm
 
 - normalization은 exploding/vanishing gradient를 막아 학습을 안정시킨다
@@ -1411,6 +1421,8 @@ $$
     - inference 때 계산이 조금 늘어난다 (latent에서 KV로 가는 projection).
     - MLA는 RoPE와 호환되지 않는다.
 
+![image.png](notes-img/image-4.png)
+
 - **cross-layer attention**은 layer끼리 KV를 공유한다.
 
 **local attention**
@@ -1557,6 +1569,8 @@ def sample(logits, temperature=1.0, top_k=None, top_p=None):
 ## RNNs
 
 ### Vanilla RNN
+
+![rnn (2).png](notes-img/rnn.png)
 
 - 각 step $t$에서 $x\in\mathbb R^D$와 이전 hidden state $h_{t-1}\in\mathbb R^H$를 처리해 다음 hidden state $h_t$를 만든다 ($D$는 input size, $H$는 hidden size).
     - weight 행렬은 $W_x\in\mathbb R^{H\times D}$, $W_h\in\mathbb R^{H\times H}$다.
@@ -2113,6 +2127,8 @@ def sample(logits, temperature=1.0, top_k=None, top_p=None):
     $$
     \operatorname{AllReduce}_Y\mathbf A[I,J]\{U_Y\}\rightarrow A[I, J]
     $$
+
+![collectives.png](notes-img/collectives.png)
     
 
 - ring all-reduce: reduce-scatter + all-gather(각 process는 이웃 둘과 통신한다) [animation]
@@ -2148,6 +2164,8 @@ def sample(logits, temperature=1.0, top_k=None, top_p=None):
 - mesh 차원이 표기에 없으면 그 차원을 따라 데이터가 복제된다는 뜻이다
     - $Y$가 없으면 각 column이 같은 데이터를 갖는다
 
+![image.png](notes-img/image-5.png)
+
 - matmul의 좋은 성질: 곱하는 matrix를 block으로 쓰면 곱도 block matmul로 쓸 수 있다
 - matmul 네 가지 경우
     - case 1: 어느 matrix도 contracting dimension이 shard되지 않았다
@@ -2155,6 +2173,8 @@ def sample(logits, temperature=1.0, top_k=None, top_p=None):
         $$
         \mathbf A[I_X,J]\cdot \mathbf B[J, K_Y]\rightarrow \mathbf C[I_X, K_Y]
         $$
+
+        ![parallelism.png](notes-img/parallelism.png)
         
         - 통신이 필요 없다
         - 로컬 block matmul을 한다
@@ -2271,6 +2291,8 @@ def sample(logits, temperature=1.0, top_k=None, top_p=None):
               = h_0 @ W2_0 + h_1 @ W2_1
               = y_0 + y_1
             ```
+
+![mlp-tp.drawio.png](notes-img/mlp-tp.drawio.png)
             
 
 - 다른 sharding을 고르면 중간에 collective가 필요해진다
@@ -2288,10 +2310,10 @@ def sample(logits, temperature=1.0, top_k=None, top_p=None):
             self.rank = rank
     
             self.linear = nn.Linear(
-                  in_features,
-                  self.out_features_per_rank,
-                  bias=False,
-                  device=f"cuda:{rank}"
+    	          in_features,
+    	          self.out_features_per_rank,
+    	          bias=False,
+    	          device=f"cuda:{rank}"
             )
         
         def forward(self, x):
@@ -2304,10 +2326,10 @@ def sample(logits, temperature=1.0, top_k=None, top_p=None):
             self.rank = rank
             
             self.linear = nn.Linear(
-                    self.in_features_per_rank,
-                  out_features,        
-                  bias=False,
-                  device=f"cuda:{rank}"
+    		        self.in_features_per_rank,
+    	          out_features,        
+    	          bias=False,
+    	          device=f"cuda:{rank}"
             )
         
         def forward(self, x):
@@ -2407,6 +2429,10 @@ def sample(logits, temperature=1.0, top_k=None, top_p=None):
     Full sequence [256 + N, 4096]
         ↓ LLM transformer
     ```
+
+![LLaVA architecture](notes-img/llava_arch.png)
+
+LLaVA architecture
     
 
 - LLaVA-NeXT dynamic resolution

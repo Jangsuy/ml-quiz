@@ -42,6 +42,7 @@ async function main() {
     if (!res.ok) throw new Error(`notes.md를 불러오지 못했습니다. (HTTP ${res.status})`);
     const { text, math } = protectMath(await res.text());
     noteEl.innerHTML = restoreMath(marked.parse(text), math);
+    noteEl.querySelectorAll('pre code').forEach((el) => hljs.highlightElement(el));
     buildToc();
     if (location.hash) document.getElementById(location.hash.slice(1))?.scrollIntoView();
   } catch (err) {
