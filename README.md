@@ -63,3 +63,4 @@ https://jangsuy.github.io/ml-quiz/notes.html
 
 - 내용은 `notes.md`만 고치면 된다. 일반 마크다운 파일이라 백슬래시를 두 번 쓸 필요가 없다.
 - `# ` 제목이 상단 바로가기 칩이 된다.
+- 이미지는 `notes-img/`에 둔다. Notion export 원본 이름이 공백과 괄호를 포함해서 일부는 이름을 바꿨다.
